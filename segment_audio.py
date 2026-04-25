@@ -302,6 +302,67 @@ def normalize_segments(
     return out
 
 
+# ---------- silence snapping ----------
+
+def _rms_min_time(audio, sr: int, t0: float, t1: float, frame_ms: int = 20) -> float | None:
+    """Return the timestamp of the lowest-energy short frame in audio[t0:t1].
+    Returns None if the window is too short to evaluate."""
+    import numpy as np
+    n = len(audio)
+    i0 = max(0, int(t0 * sr))
+    i1 = min(n, int(t1 * sr))
+    frame_len = max(1, int(sr * frame_ms / 1000))
+    hop = max(1, frame_len // 2)
+    if i1 - i0 < frame_len * 2:
+        return None
+    # vectorised: sliding window via stride trick on a power-of-2 frame
+    starts = np.arange(i0, i1 - frame_len + 1, hop)
+    if len(starts) < 2:
+        return None
+    # compute RMS per frame
+    rms = np.empty(len(starts), dtype=np.float32)
+    for k, a in enumerate(starts):
+        seg = audio[a:a + frame_len]
+        rms[k] = float(np.sqrt(np.mean(seg.astype(np.float32) ** 2)))
+    best = int(np.argmin(rms))
+    return float((starts[best] + frame_len / 2.0) / sr)
+
+
+def snap_boundaries_to_silence(
+    segs: list[Segment],
+    audio,
+    sr: int,
+    radius: float = 0.30,
+    max_shift: float = 0.40,
+) -> None:
+    """Adjust every internal boundary between consecutive segments to land at
+    the lowest-energy frame within ±radius seconds of the current cut.
+
+    Mutates `segs` in place. The first segment's start and the last segment's
+    end are left alone (they're at the audio edges)."""
+    if len(segs) < 2:
+        return
+    moved = 0
+    for i in range(len(segs) - 1):
+        a = segs[i]
+        b = segs[i + 1]
+        cut = (a.end + b.start) / 2.0
+        # Search a window around the cut, but don't cross adjacent segments' midpoints.
+        lo = max(a.start + 0.05, cut - radius)
+        hi = min(b.end - 0.05, cut + radius)
+        if hi <= lo:
+            continue
+        snapped = _rms_min_time(audio, sr, lo, hi)
+        if snapped is None:
+            continue
+        if abs(snapped - cut) > max_shift:
+            continue  # silence too far from intended cut — Whisper probably knew better
+        a.end = snapped
+        b.start = snapped
+        moved += 1
+    print(f"[snap] adjusted {moved}/{len(segs) - 1} internal boundaries to nearest silence", flush=True)
+
+
 # ---------- main pipeline ----------
 
 def _add_nvidia_dll_dirs() -> None:
@@ -541,6 +602,16 @@ def main() -> None:
                     help="Seconds of audio to keep before each clip's start (default 0.15).")
     ap.add_argument("--pad-tail", type=float, default=0.25,
                     help="Seconds of audio to keep after each clip's end (default 0.25).")
+    ap.add_argument("--no-snap", action="store_true",
+                    help="Disable snapping segment boundaries to the lowest-energy point "
+                         "in the surrounding waveform. Boundaries from Whisper alone are "
+                         "often off by 50-200ms and chop word tails.")
+    ap.add_argument("--snap-radius", type=float, default=0.30,
+                    help="Search ±this many seconds around each boundary for true silence "
+                         "(default 0.30).")
+    ap.add_argument("--snap-max-shift", type=float, default=0.40,
+                    help="Don't move a boundary by more than this many seconds even if a "
+                         "lower-energy point exists further away (default 0.40).")
     ap.add_argument("--audio-url-prefix", default="",
                     help="Prefix to prepend to clip filenames in the JSON 'audio' field "
                          "(e.g. '/data/local-files/?d=clips/' for Label Studio local storage).")
@@ -621,6 +692,16 @@ def main() -> None:
         segs = [s for s in segs if (s.end - s.start) >= args.min_seg]
         print(f"[seg] {len(raw)} raw -> {len(segs)} normalized segments", flush=True)
 
+        # 4a. snap every internal boundary to the local silence in the actual
+        # waveform. Whisper's reported word/segment ends are off by 50-200ms,
+        # which is enough to clip the tail of words like "exactement".
+        if not args.no_snap:
+            master_audio, sr = load_master_audio_f32(wav)
+            snap_boundaries_to_silence(
+                segs, master_audio, sr,
+                radius=args.snap_radius, max_shift=args.snap_max_shift,
+            )
+
         # 4b. optional: re-transcribe each segment with a language-specific CTC
         # ASR (e.g. w2v-bert-2.0-malagasy-asr). Whisper's text is overwritten.
         if args.asr_model:
@@ -629,7 +710,8 @@ def main() -> None:
                 device=("cuda" if device == "cuda" else "cpu"),
                 language_hint=language,
             )
-            master_audio, sr = load_master_audio_f32(wav)
+            if 'master_audio' not in locals():
+                master_audio, sr = load_master_audio_f32(wav)
             if sr != transcriber.sample_rate:
                 sys.exit(f"Master WAV is {sr} Hz but ASR model expects {transcriber.sample_rate} Hz.")
             retranscribe_segments(
