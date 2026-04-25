@@ -10,6 +10,12 @@
 #   "imageio-ffmpeg>=0.5.1",
 #   "nvidia-cublas-cu12; platform_system != 'Darwin'",
 #   "nvidia-cudnn-cu12; platform_system != 'Darwin'",
+#   "nvidia-cuda-runtime-cu12; platform_system != 'Darwin'",
+#   # Optional: HuggingFace CTC ASR (e.g. w2v-bert-2.0-malagasy-asr) for the
+#   # `--asr-model` hybrid path. Only loaded if that flag is set.
+#   "transformers>=4.45.0",
+#   "torch>=2.3.0",
+#   "soundfile>=0.12.1",
 # ]
 # ///
 """
@@ -110,17 +116,34 @@ def to_wav_16k_mono(src: Path, dst: Path) -> Path:
     return dst
 
 
-def slice_wav(src_wav: Path, start: float, end: float, dst: Path) -> None:
-    """Cut [start,end] from a WAV losslessly via ffmpeg."""
+def slice_wav(
+    src_wav: Path,
+    start: float,
+    end: float,
+    dst: Path,
+    pad_head: float = 0.15,
+    pad_tail: float = 0.25,
+    total_duration: float | None = None,
+) -> None:
+    """Cut [start,end] from a WAV with small head/tail padding so words at the
+    boundary aren't truncated. Re-encodes to PCM s16le for sample-accurate cuts
+    (ffmpeg -c copy is only frame-accurate)."""
+    s = max(0.0, start - pad_head)
+    e = end + pad_tail
+    if total_duration is not None:
+        e = min(e, total_duration)
     cmd = [
         ffmpeg_bin(), "-y",
-        "-ss", f"{start:.3f}", "-to", f"{end:.3f}",
+        "-ss", f"{s:.3f}", "-to", f"{e:.3f}",
         "-i", str(src_wav),
-        "-c", "copy",
+        "-ac", "1", "-ar", "16000",
+        "-c:a", "pcm_s16le",
         str(dst),
     ]
-    # PCM WAV with stream copy works fine for sample-accurate-ish cuts at these scales.
-    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if r.returncode != 0:
+        sys.stderr.write(r.stderr.decode("utf-8", errors="replace"))
+        raise RuntimeError(f"ffmpeg slice failed (exit {r.returncode}) at {start:.2f}-{end:.2f}")
 
 
 # ---------- segmentation ----------
@@ -133,41 +156,113 @@ class Segment:
     confidence: float | None = None
 
 
-def split_long_segment(words, max_len: float, target_len: float) -> list[Segment]:
+def _emit_chunk(words_slice) -> Segment:
+    text = "".join(x.word for x in words_slice).strip()
+    probs = [x.probability for x in words_slice if x.probability is not None]
+    conf = float(sum(probs) / len(probs)) if probs else None
+    # Use the *midpoint of the gap* on each side so adjacent chunks meet in
+    # silence rather than straddling a word boundary. The caller sets the actual
+    # start/end after looking at neighbouring words.
+    return Segment(float(words_slice[0].start), float(words_slice[-1].end), text, conf)
+
+
+def split_long_segment(
+    words,
+    min_len: float,
+    max_len: float,
+    target_len: float,
+) -> list[Segment]:
     """
-    Split a Whisper segment whose duration > max_len into chunks ~target_len long,
-    cutting at word boundaries. `words` is faster-whisper's per-word list.
+    Split a Whisper segment whose duration > max_len into chunks aiming for
+    ~target_len, but cutting at the *largest inter-word silence* inside the
+    [min_len, max_len] window — never inside a tight word boundary.
+
+    Boundary timestamps are placed at the *midpoint* of the chosen silence so
+    neighbouring clips don't fight over the same audio.
     """
     if not words:
         return []
 
+    n = len(words)
     chunks: list[Segment] = []
-    cur_words = []
-    cur_start = words[0].start
+    i = 0  # index of first word in current chunk
+    chunk_start = float(words[0].start)
 
-    for w in words:
-        cur_words.append(w)
-        dur = w.end - cur_start
-        if dur >= target_len:
-            text = "".join(x.word for x in cur_words).strip()
-            probs = [x.probability for x in cur_words if x.probability is not None]
-            conf = float(sum(probs) / len(probs)) if probs else None
-            chunks.append(Segment(cur_start, w.end, text, conf))
-            cur_words = []
-            # next chunk starts at next word's start (set on next iteration)
-            cur_start = None  # type: ignore
+    while i < n:
+        # Find the latest word j such that words[j].end - chunk_start <= max_len.
+        # Inside [min_len, max_len], pick the gap (between j and j+1) with the
+        # largest silence; prefer gaps near target_len when silences tie.
+        best_j = None
+        best_score = -1.0  # silence size, tie-broken by closeness to target
 
-        elif cur_start is None:
-            cur_start = w.start
+        j = i
+        while j < n:
+            dur = float(words[j].end) - chunk_start
+            if dur > max_len:
+                break
+            if dur >= min_len and j + 1 < n:
+                gap = float(words[j + 1].start) - float(words[j].end)
+                # closeness to target ∈ [0,1]; bigger is better
+                proximity = 1.0 - min(abs(dur - target_len) / max(target_len, 1e-3), 1.0)
+                # silence dominates; proximity is a tiebreaker
+                score = gap + 0.05 * proximity
+                if score > best_score:
+                    best_score = score
+                    best_j = j
+            j += 1
 
-    if cur_words:
-        text = "".join(x.word for x in cur_words).strip()
-        probs = [x.probability for x in cur_words if x.probability is not None]
-        conf = float(sum(probs) / len(probs)) if probs else None
-        start = cur_words[0].start
-        chunks.append(Segment(start, cur_words[-1].end, text, conf))
+        if best_j is None:
+            # No acceptable gap found inside the window. Two cases:
+            #  a) the remaining tail fits within max_len → emit it as one chunk.
+            #  b) a single word/run is longer than max_len → force-cut at j-1
+            #     to make progress (rare for natural speech).
+            if j >= n:
+                # tail fits
+                chunk = _emit_chunk(words[i:n])
+                # Snap start to chunk_start (which may already be a midpoint)
+                chunk.start = chunk_start
+                chunks.append(chunk)
+                break
+            else:
+                # forced cut: take everything up to j-1 (or just word i if j==i)
+                cut = max(j - 1, i)
+                chunk = _emit_chunk(words[i:cut + 1])
+                chunk.start = chunk_start
+                # boundary at midpoint of gap to next word (if any), else end
+                if cut + 1 < n:
+                    mid = (float(words[cut].end) + float(words[cut + 1].start)) / 2.0
+                    chunk.end = mid
+                    chunk_start = mid
+                else:
+                    chunk_start = float(words[cut].end)
+                chunks.append(chunk)
+                i = cut + 1
+                continue
 
-    # Merge a tiny tail (< min) into the previous chunk if needed
+        # Normal path: cut at midpoint of gap after best_j
+        chunk = _emit_chunk(words[i:best_j + 1])
+        chunk.start = chunk_start
+        mid = (float(words[best_j].end) + float(words[best_j + 1].start)) / 2.0
+        chunk.end = mid
+        chunks.append(chunk)
+        chunk_start = mid
+        i = best_j + 1
+
+    # Soft-merge: if the last chunk is shorter than min_len, fold it into the
+    # previous one rather than dropping it.
+    if len(chunks) >= 2 and (chunks[-1].end - chunks[-1].start) < min_len:
+        tail = chunks.pop()
+        prev = chunks[-1]
+        merged_text = (prev.text + " " + tail.text).strip()
+        # average confidence weighted by duration
+        d1 = prev.end - prev.start
+        d2 = tail.end - tail.start
+        if prev.confidence is not None and tail.confidence is not None and (d1 + d2) > 0:
+            conf = (prev.confidence * d1 + tail.confidence * d2) / (d1 + d2)
+        else:
+            conf = prev.confidence if prev.confidence is not None else tail.confidence
+        chunks[-1] = Segment(prev.start, tail.end, merged_text, conf)
+
     return chunks
 
 
@@ -194,7 +289,7 @@ def normalize_segments(
 
         words = getattr(seg, "words", None) or []
         if words:
-            out.extend(split_long_segment(words, max_len, target_len))
+            out.extend(split_long_segment(words, min_len, max_len, target_len))
         else:
             # No word timestamps — fall back to uniform cuts
             n = max(1, int(round(dur / target_len)))
@@ -210,21 +305,37 @@ def normalize_segments(
 # ---------- main pipeline ----------
 
 def _add_nvidia_dll_dirs() -> None:
-    """Make the bundled nvidia-cublas/cudnn DLLs discoverable on Windows."""
+    """Make the bundled nvidia-* DLLs discoverable on Windows.
+
+    ctranslate2 dynamically loads cuBLAS/cuDNN with plain LoadLibrary, which
+    doesn't honor `os.add_dll_directory` (that only applies when the caller
+    passes LOAD_LIBRARY_SEARCH_USER_DIRS). So we also prepend the dirs to
+    PATH, which every LoadLibrary call respects."""
     if os.name != "nt":
         return
+    bin_dirs: list[str] = []
     try:
         import importlib.util
-        for pkg in ("nvidia.cublas", "nvidia.cudnn"):
-            spec = importlib.util.find_spec(pkg)
-            if not spec or not spec.submodule_search_locations:
-                continue
-            for loc in spec.submodule_search_locations:
-                bin_dir = Path(loc) / "bin"
+        # Walk all top-level subpackages under `nvidia` and pick up any /bin dir.
+        nvidia_spec = importlib.util.find_spec("nvidia")
+        roots: list[Path] = []
+        if nvidia_spec and nvidia_spec.submodule_search_locations:
+            roots = [Path(p) for p in nvidia_spec.submodule_search_locations]
+        for root in roots:
+            for child in root.iterdir():
+                bin_dir = child / "bin"
                 if bin_dir.is_dir():
-                    os.add_dll_directory(str(bin_dir))
+                    bin_dirs.append(str(bin_dir))
     except Exception:
         pass
+
+    for d in bin_dirs:
+        try:
+            os.add_dll_directory(d)
+        except (OSError, FileNotFoundError):
+            pass
+    if bin_dirs:
+        os.environ["PATH"] = os.pathsep.join(bin_dirs) + os.pathsep + os.environ.get("PATH", "")
 
 
 def transcribe(
@@ -233,15 +344,15 @@ def transcribe(
     language: str | None,
     device: str,
     compute_type: str,
+    require_gpu: bool = False,
 ):
-    _add_nvidia_dll_dirs()
     from faster_whisper import WhisperModel
 
     print(f"[whisper] loading model={model_size} device={device} compute_type={compute_type}", flush=True)
     try:
         model = WhisperModel(model_size, device=device, compute_type=compute_type)
     except Exception as e:
-        if device == "cuda":
+        if device == "cuda" and not require_gpu:
             print(f"[whisper] CUDA init failed ({e}); falling back to CPU/int8.", flush=True)
             device, compute_type = "cpu", "int8"
             model = WhisperModel(model_size, device=device, compute_type=compute_type)
@@ -253,7 +364,7 @@ def transcribe(
         language=language,            # None = auto-detect
         task="transcribe",
         vad_filter=True,              # speech-activity detection
-        vad_parameters={"min_silence_duration_ms": 500},
+        vad_parameters={"min_silence_duration_ms": 800, "speech_pad_ms": 200},
         word_timestamps=True,         # needed for clean re-splitting
         beam_size=1,                  # weak transcription, keep it fast
         condition_on_previous_text=False,
@@ -261,6 +372,94 @@ def transcribe(
     print(f"[whisper] detected language={info.language} (p={info.language_probability:.2f}) "
           f"duration={info.duration:.1f}s", flush=True)
     return list(tqdm(segments, desc="decoding", unit="seg"))
+
+
+# ---------- optional CTC re-transcriber (e.g. w2v-bert-2.0-malagasy-asr) ----------
+
+class CTCTranscriber:
+    """Loads a HuggingFace CTC ASR model (e.g. Wav2Vec2-BERT) and re-transcribes
+    audio chunks. Used to replace Whisper's weak text with output from a model
+    fine-tuned on the target language.
+
+    Both the model id and the language are runtime parameters — nothing is
+    hardcoded — so this works for any HF CTC ASR fine-tune."""
+
+    def __init__(self, model_id: str, device: str, language_hint: str | None = None):
+        import torch
+        from transformers import AutoProcessor, AutoModelForCTC
+
+        self.torch = torch
+        self.device = "cuda" if (device == "cuda" and torch.cuda.is_available()) else "cpu"
+        self.dtype = torch.float16 if self.device == "cuda" else torch.float32
+        self.language_hint = language_hint  # informational only; CTC models are usually monolingual
+
+        print(f"[asr] loading model={model_id} device={self.device} dtype={self.dtype}", flush=True)
+        self.processor = AutoProcessor.from_pretrained(model_id)
+        self.model = AutoModelForCTC.from_pretrained(model_id, torch_dtype=self.dtype).to(self.device).eval()
+        # Sample rate the processor expects (almost always 16000 for w2v-bert).
+        fe = getattr(self.processor, "feature_extractor", self.processor)
+        self.sample_rate = int(getattr(fe, "sampling_rate", 16000))
+
+    def transcribe_chunk(self, audio_f32: "np.ndarray") -> tuple[str, float | None]:
+        """Run one forward pass on a 1-D float32 numpy array. Returns (text, confidence)."""
+        torch = self.torch
+        inputs = self.processor(
+            audio_f32, sampling_rate=self.sample_rate, return_tensors="pt"
+        )
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        # input_features for w2v-bert (Wav2Vec2BertProcessor) or input_values for plain w2v2.
+        if self.dtype == torch.float16:
+            for k in ("input_features", "input_values"):
+                if k in inputs:
+                    inputs[k] = inputs[k].to(torch.float16)
+
+        with torch.inference_mode():
+            logits = self.model(**inputs).logits  # (1, T, V)
+        pred_ids = logits.argmax(dim=-1)
+        text = self.processor.batch_decode(pred_ids)[0].strip()
+
+        # Confidence proxy: mean max-softmax over predicted frames.
+        probs = torch.softmax(logits.float(), dim=-1)
+        conf = float(probs.max(dim=-1).values.mean().item())
+        return text, conf
+
+
+def load_master_audio_f32(wav_path: Path) -> tuple["np.ndarray", int]:
+    """Load the 16 kHz mono master WAV into a float32 numpy array in [-1, 1]."""
+    import wave
+    import numpy as np
+    with wave.open(str(wav_path), "rb") as wf:
+        sr = wf.getframerate()
+        n = wf.getnframes()
+        raw = wf.readframes(n)
+    audio = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    return audio, sr
+
+
+def retranscribe_segments(
+    segs: list[Segment],
+    master_audio,
+    sample_rate: int,
+    transcriber: CTCTranscriber,
+    pad_head: float = 0.15,
+    pad_tail: float = 0.25,
+) -> None:
+    """Replace each segment's `text` and `confidence` with output from the CTC
+    model. Mutates `segs` in place."""
+    total = len(master_audio)
+    for s in tqdm(segs, desc="asr", unit="seg"):
+        i0 = max(0, int((s.start - pad_head) * sample_rate))
+        i1 = min(total, int((s.end + pad_tail) * sample_rate))
+        if i1 <= i0:
+            continue
+        chunk = master_audio[i0:i1]
+        try:
+            text, conf = transcriber.transcribe_chunk(chunk)
+        except Exception as e:
+            print(f"[asr] segment {s.start:.2f}-{s.end:.2f} failed: {e}", flush=True)
+            continue
+        s.text = text
+        s.confidence = conf
 
 
 def pick_device(arg: str) -> tuple[str, str]:
@@ -280,6 +479,11 @@ def pick_device(arg: str) -> tuple[str, str]:
 
 
 def main() -> None:
+    # Must run BEFORE anything imports ctranslate2 (e.g. pick_device's cuda check),
+    # otherwise the native lib is loaded with the original DLL search path and
+    # cublas64_12.dll / cudnn64_9.dll won't be findable later.
+    _add_nvidia_dll_dirs()
+
     ap = argparse.ArgumentParser(description="Weak transcription + segmentation for Label Studio.")
     ap.add_argument("input", help="Path or URL to an audio file (mp3/wav/m4a/...).")
     ap.add_argument("--output", "-o", default="./dataset", help="Output directory.")
@@ -289,10 +493,21 @@ def main() -> None:
     ap.add_argument("--model", default="large-v3",
                     help="faster-whisper model size: tiny|base|small|medium|large-v3|...")
     ap.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
+    ap.add_argument("--require-gpu", action="store_true",
+                    help="Abort with an error if the GPU isn't usable, instead of falling back to CPU.")
+    ap.add_argument("--asr-model", default="",
+                    help="Optional HuggingFace CTC ASR model id used to replace Whisper's draft "
+                         "text per segment (Whisper still does VAD + segmentation). "
+                         "Example: 'Ilakorasoa/w2v-bert-2.0-malagasy-asr'. "
+                         "Leave empty to keep Whisper's text.")
     ap.add_argument("--min-seg", type=float, default=2.0, help="Drop segments shorter than this (s).")
     ap.add_argument("--max-seg", type=float, default=30.0, help="Re-split segments longer than this (s).")
     ap.add_argument("--target-seg", type=float, default=20.0, help="Target chunk length when splitting (s).")
     ap.add_argument("--no-clips", action="store_true", help="Skip per-segment audio export.")
+    ap.add_argument("--pad-head", type=float, default=0.15,
+                    help="Seconds of audio to keep before each clip's start (default 0.15).")
+    ap.add_argument("--pad-tail", type=float, default=0.25,
+                    help="Seconds of audio to keep after each clip's end (default 0.25).")
     ap.add_argument("--audio-url-prefix", default="",
                     help="Prefix to prepend to clip filenames in the JSON 'audio' field "
                          "(e.g. '/data/local-files/?d=clips/' for Label Studio local storage).")
@@ -300,11 +515,8 @@ def main() -> None:
 
     ensure_ffmpeg()
 
-    out_dir = Path(args.output).resolve()
-    clips_dir = out_dir / "clips"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    if not args.no_clips:
-        clips_dir.mkdir(exist_ok=True)
+    out_root = Path(args.output).resolve()
+    out_root.mkdir(parents=True, exist_ok=True)
 
     language = None if args.language.lower() == "auto" else args.language
 
@@ -330,20 +542,41 @@ def main() -> None:
         # Sanitize stem for output filenames too.
         ascii_stem = "".join(c if (c.isalnum() or c in "-_") else "_" for c in stem).strip("_") or "audio"
         stem = ascii_stem
+
+        # One folder per source: clips and JSON live together inside it.
+        project_dir = out_root / stem
+        if project_dir.exists() and not args.no_clips:
+            # Drop stale clips from prior runs — they don't match new segment indices.
+            for old in project_dir.glob("*.wav"):
+                old.unlink()
+        project_dir.mkdir(parents=True, exist_ok=True)
+
         wav = tmp_dir / f"{stem}.16k.wav"
         print(f"[ffmpeg] {src.name} -> 16k mono wav", flush=True)
         to_wav_16k_mono(safe_src, wav)
 
-        # 3. transcribe (with CUDA->CPU fallback if cuBLAS/cuDNN are missing
-        # or the GPU run fails mid-decode)
-        device, compute_type = pick_device(args.device)
+        # Probe total duration so we can clamp clip padding to the file end.
         try:
-            raw = transcribe(wav, args.model, language, device, compute_type)
+            import wave
+            with wave.open(str(wav), "rb") as wf:
+                total_duration = wf.getnframes() / float(wf.getframerate())
+        except Exception:
+            total_duration = None
+
+        # 3. transcribe. CUDA failures fall back to CPU unless --require-gpu is set.
+        device, compute_type = pick_device(args.device)
+        if args.require_gpu and device != "cuda":
+            sys.exit(f"--require-gpu set but no usable CUDA device was found (device={device}). "
+                     f"Check `nvidia-smi` and that nvidia-cublas-cu12 / nvidia-cudnn-cu12 are installed.")
+        try:
+            raw = transcribe(wav, args.model, language, device, compute_type,
+                             require_gpu=args.require_gpu)
         except RuntimeError as e:
-            if device == "cuda":
+            if device == "cuda" and not args.require_gpu:
                 print(f"[whisper] CUDA decode failed ({e}); retrying on CPU.", flush=True)
                 raw = transcribe(wav, args.model, language, "cpu", "int8")
             else:
+                # In require-gpu mode, surface the original CUDA error verbatim.
                 raise
 
         # 4. normalize lengths
@@ -353,12 +586,32 @@ def main() -> None:
         segs = [s for s in segs if (s.end - s.start) >= args.min_seg]
         print(f"[seg] {len(raw)} raw -> {len(segs)} normalized segments", flush=True)
 
+        # 4b. optional: re-transcribe each segment with a language-specific CTC
+        # ASR (e.g. w2v-bert-2.0-malagasy-asr). Whisper's text is overwritten.
+        if args.asr_model:
+            transcriber = CTCTranscriber(
+                args.asr_model,
+                device=("cuda" if device == "cuda" else "cpu"),
+                language_hint=language,
+            )
+            master_audio, sr = load_master_audio_f32(wav)
+            if sr != transcriber.sample_rate:
+                sys.exit(f"Master WAV is {sr} Hz but ASR model expects {transcriber.sample_rate} Hz.")
+            retranscribe_segments(
+                segs, master_audio, sr, transcriber,
+                pad_head=args.pad_head, pad_tail=args.pad_tail,
+            )
+
         # 5. write clips + JSON
         tasks = []
         for i, s in enumerate(tqdm(segs, desc="writing", unit="clip")):
             clip_name = f"{stem}_{i:05d}_{int(s.start*1000):08d}_{int(s.end*1000):08d}.wav"
             if not args.no_clips:
-                slice_wav(wav, s.start, s.end, clips_dir / clip_name)
+                slice_wav(
+                    wav, s.start, s.end, project_dir / clip_name,
+                    pad_head=args.pad_head, pad_tail=args.pad_tail,
+                    total_duration=total_duration,
+                )
             audio_ref = f"{args.audio_url_prefix}{clip_name}" if args.audio_url_prefix else clip_name
             task = {
                 "audio": audio_ref,
@@ -370,14 +623,13 @@ def main() -> None:
                 task["confidence"] = round(s.confidence, 3)
             tasks.append(task)
 
-        json_path = out_dir / f"{stem}.label_studio.json"
+        json_path = project_dir / f"{stem}.label_studio.json"
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(tasks, f, ensure_ascii=False, indent=2)
 
         print(f"[done] {len(tasks)} segments")
-        print(f"       JSON  : {json_path}")
-        if not args.no_clips:
-            print(f"       clips : {clips_dir}")
+        print(f"       project: {project_dir}")
+        print(f"       JSON   : {json_path.name}")
 
 
 if __name__ == "__main__":
