@@ -338,6 +338,14 @@ def _add_nvidia_dll_dirs() -> None:
         os.environ["PATH"] = os.pathsep.join(bin_dirs) + os.pathsep + os.environ.get("PATH", "")
 
 
+# Anchor for native model objects so ctranslate2's CUDA destructor doesn't run
+# at function-return time — it segfaults during cleanup of large-v3/CUDA fp16
+# state, taking the whole process with it (exit 127, no Python traceback).
+# We pair this with os._exit() at the end of main() to skip interpreter
+# shutdown entirely.
+_LIVE_MODELS: list = []
+
+
 def transcribe(
     wav_path: Path,
     model_size: str,
@@ -358,20 +366,40 @@ def transcribe(
             model = WhisperModel(model_size, device=device, compute_type=compute_type)
         else:
             raise
+    _LIVE_MODELS.append(model)
 
     segments, info = model.transcribe(
         str(wav_path),
         language=language,            # None = auto-detect
         task="transcribe",
         vad_filter=True,              # speech-activity detection
-        vad_parameters={"min_silence_duration_ms": 800, "speech_pad_ms": 200},
+        vad_parameters={"min_silence_duration_ms": 800},
         word_timestamps=True,         # needed for clean re-splitting
         beam_size=1,                  # weak transcription, keep it fast
         condition_on_previous_text=False,
     )
     print(f"[whisper] detected language={info.language} (p={info.language_probability:.2f}) "
           f"duration={info.duration:.1f}s", flush=True)
-    return list(tqdm(segments, desc="decoding", unit="seg"))
+
+    # Materialize the generator carefully. Each segment is a frozen-ish object
+    # with .start/.end/.text/.avg_logprob/.words; convert to a plain dict so
+    # nothing native is held when ctranslate2's GPU buffers are torn down.
+    out = []
+    for seg in tqdm(segments, desc="decoding", unit="seg"):
+        words = []
+        for w in (getattr(seg, "words", None) or []):
+            words.append(type("W", (), {
+                "start": float(w.start), "end": float(w.end),
+                "word": w.word, "probability": getattr(w, "probability", None),
+            })())
+        out.append(type("S", (), {
+            "start": float(seg.start), "end": float(seg.end),
+            "text": seg.text,
+            "avg_logprob": getattr(seg, "avg_logprob", None),
+            "words": words,
+        })())
+    print(f"[whisper] decoding finished: {len(out)} raw segments", flush=True)
+    return out
 
 
 # ---------- optional CTC re-transcriber (e.g. w2v-bert-2.0-malagasy-asr) ----------
@@ -463,16 +491,21 @@ def retranscribe_segments(
 
 
 def pick_device(arg: str) -> tuple[str, str]:
-    """Return (device, compute_type). Auto = use CUDA if available, else CPU."""
+    """Return (device, compute_type). Auto = use CUDA if available, else CPU.
+
+    int8_float16 is preferred on CUDA over plain float16 — it uses less VRAM
+    and avoids a stability bug we hit in ctranslate2's float16 cleanup path
+    when word_timestamps is enabled on long-form audio (process crashes with
+    no Python traceback right after the last segment is emitted)."""
     if arg == "cpu":
         return "cpu", "int8"
     if arg == "cuda":
-        return "cuda", "float16"
+        return "cuda", "int8_float16"
     # auto
     try:
         import ctranslate2
         if ctranslate2.get_cuda_device_count() > 0:
-            return "cuda", "float16"
+            return "cuda", "int8_float16"
     except Exception:
         pass
     return "cpu", "int8"
@@ -580,9 +613,11 @@ def main() -> None:
                 raise
 
         # 4. normalize lengths
+        print(f"[seg] decoding done; {len(raw)} raw segments. normalizing...", flush=True)
         segs = normalize_segments(
             raw, min_len=args.min_seg, max_len=args.max_seg, target_len=args.target_seg
         )
+        print(f"[seg] normalize_segments returned {len(segs)} segments. filtering...", flush=True)
         segs = [s for s in segs if (s.end - s.start) >= args.min_seg]
         print(f"[seg] {len(raw)} raw -> {len(segs)} normalized segments", flush=True)
 
@@ -630,6 +665,12 @@ def main() -> None:
         print(f"[done] {len(tasks)} segments")
         print(f"       project: {project_dir}")
         print(f"       JSON   : {json_path.name}")
+
+    # Skip interpreter shutdown to avoid the ctranslate2 CUDA destructor segfault.
+    # All outputs are flushed to disk by this point; there's nothing left to clean.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)
 
 
 if __name__ == "__main__":
