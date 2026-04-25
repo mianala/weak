@@ -145,7 +145,13 @@ class ASR:
         self.torch = torch
         self.model_id = model_id
         self.device = _resolve_device(device)
-        self.dtype = torch.float16 if self.device == "cuda" else torch.float32
+        # fp32 by default on CUDA — fp16 has caused native crashes on Windows
+        # with some w2v-bert checkpoints. Override via FORCE_FP16=1 env var.
+        self.dtype = (
+            torch.float16
+            if (self.device == "cuda" and os.environ.get("FORCE_FP16") == "1")
+            else torch.float32
+        )
         self.kind = _model_kind(model_id)
         self.language = language
 

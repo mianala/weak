@@ -1,0 +1,613 @@
+{
+  "input": "E:\\Projects\\weak\\dataset\\VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1\\VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1.label_studio.json",
+  "language": "mg",
+  "device": "cuda",
+  "models": [
+    "BadRex/w2v-bert-2.0-malagasy-asr"
+  ],
+  "wer": {
+    "w2v-bert-2.0-malagasy-asr": 1.1026119402985075
+  },
+  "items": [
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00000_00000000_00004160.wav",
+      "start": 0.0,
+      "end": 4.16,
+      "reference": "PDP, nou taray gana natan lewe, yina neto we community managera, exactement.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "be dia be no taraiky any anatin'ilay hoe inona atao hoe kominisymanadraora egzak",
+          "confidence": 0.853
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00001_00004680_00008600.wav",
+      "start": 4.68,
+      "end": 8.6,
+      "reference": "Zava dhuit suwe, androan e mianatja te avaka tapapula natima afi an lias.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "manko zavatra hoitsy hoe androany mianatra dia afaka tapa-bolanah dia mahafehan'ilay a",
+          "confidence": 0.868
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00002_00008720_00012020.wav",
+      "start": 8.72,
+      "end": 12.02,
+      "reference": "Ni salera nasi amazane, sa pe varie de 700 000 aryar lokalman,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "asa nisalarana sema izany asa-peovariet e setso milary ary lokalim",
+          "confidence": 0.729
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00003_00012140_00015000.wav",
+      "start": 12.14,
+      "end": 15.0,
+      "reference": "chiska min plus don zan kontra filans.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "imao jisika mainy pilosy tanizany kontra filans",
+          "confidence": 0.727
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00004_00015260_00018380.wav",
+      "start": 15.26,
+      "end": 18.38,
+      "reference": "Tumadere, loun community management, zati t'avaka manon birak la kouy.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "tsy madeha ieryaloha ny aominisy manadrmana satria tsy afaka anao mirakila koa",
+          "confidence": 0.733
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00005_00020780_00024480.wav",
+      "start": 20.78,
+      "end": 24.48,
+      "reference": "Sistem nisyo va tsuwe, resosio rir ni atok di manate na we a a zo rezultat.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "sitem izyio atsyhoerezao soasao ry ny atako dia manan-tena hoe ahazo rezolta",
+          "confidence": 0.68
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00006_00026700_00029620.wav",
+      "start": 26.7,
+      "end": 29.62,
+      "reference": "Eske te kapabl de m'aporti 5 000 euro monsuelmo?",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "o aizy keo dia kapabily de mamporite senkimiloro mansoelimo",
+          "confidence": 0.856
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00007_00029620_00033440.wav",
+      "start": 29.62,
+      "end": 33.44,
+      "reference": "Rifa ka pabla li ulla ma fida ni asanya te uminon falora umini,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "limao rehefa kapabola ilay olona mahavita any asany dia omenao ny valoho ra omena iz",
+          "confidence": 0.853
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00008_00033560_00036800.wav",
+      "start": 33.56,
+      "end": 36.8,
+      "reference": "an festismo wa noo inu linia ratara pinza avacha umini.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "veismao anao iny olona iny raha tsara be ny zavatra omeny",
+          "confidence": 0.838
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00009_00036880_00039120.wav",
+      "start": 36.88,
+      "end": 39.12,
+      "reference": "Su e ane kafa fon amensu ni duzak.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "mity tsy hoe any an-kafafoana ny maitso ny bozaka",
+          "confidence": 0.85
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00010_00039240_00042240.wav",
+      "start": 39.24,
+      "end": 42.24,
+      "reference": "Fa va ka mana amensu mbuzak azi imitio man mas no e no.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "ozaka fa afaka manamaintso ny bozaka izay mitsy eo ambanin'ny masonao ian",
+          "confidence": 0.912
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00011_00052520_00055200.wav",
+      "start": 52.52,
+      "end": 55.2,
+      "reference": "anjon si ke de anjai tu fava viana krei,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "androantsika dia andray tovovavy anankiray",
+          "confidence": 0.919
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00012_00059900_00062120.wav",
+      "start": 59.9,
+      "end": 62.12,
+      "reference": "avanyam na kartie Sho,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "be avy any amin'ny ankardia soa",
+          "confidence": 0.916
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00013_00062800_00065760.wav",
+      "start": 62.8,
+      "end": 65.76,
+      "reference": "ato matin ki uresan antiga mar margoku za eri fewa.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "atao madinika ho resahantsika maromaro kokoa izay rehiva eo",
+          "confidence": 0.944
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00014_00065760_00068860.wav",
+      "start": 65.76,
+      "end": 68.86,
+      "reference": "Fondatrice dirijanta nyatoe le digital-la,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "avy eo fondatrisy dirizanty ny atao hoe le dizitalina",
+          "confidence": 0.875
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00015_00068920_00072980.wav",
+      "start": 68.92,
+      "end": 72.98,
+      "reference": "ariz i tena ma'atuk nante raga fa manan katou ni vevav",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "alona ary izy tena mahatoko tanteraka fa manan-katao ny vehivavy",
+          "confidence": 0.898
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00016_00072980_00076840.wav",
+      "start": 72.98,
+      "end": 76.84,
+      "reference": "yao naten tutuln fanjarana si ni fanpfuar na ito Madagaskar.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "vavy ao anatin'ny tontolon'ny fandrarana sy ny fampivoarana eto madagasikara",
+          "confidence": 0.956
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00017_00076960_00079440.wav",
+      "start": 76.96,
+      "end": 79.44,
+      "reference": "Ra ua txakambula, tsi manarka nayenoa,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "tara raha ohatra ka mbola tsy manaraka anay ianao",
+          "confidence": 0.916
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00018_00079440_00083740.wav",
+      "start": 79.44,
+      "end": 83.74,
+      "reference": "ane na tutub de manasa nawa chan, fa prezonzei ane na tutub-tuba,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "ao anyainatotiobo dia manasa anao hatrany fa pezana izahy aniainatotoby",
+          "confidence": 0.832
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00019_00085580_00088960.wav",
+      "start": 85.58,
+      "end": 88.96,
+      "reference": "efamis versyon audio yanku ni podcast-a tika,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "oa efa misy versio aodio ihany koa ny podikasta antsika",
+          "confidence": 0.896
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00020_00089160_00094540.wav",
+      "start": 89.16,
+      "end": 94.54,
+      "reference": "mita noa ane nati YouTube audio, Apple podcast-a, Spotify, Deezer,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "ika hitanao any anaty iotiob aodio apl podikasta spotifay dizera",
+          "confidence": 0.907
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00021_00094540_00102800.wav",
+      "start": 94.54,
+      "end": 102.8,
+      "reference": "Ar man nom ksou de aksesiv la naiza-naiza maniratan ni podcast tanzana chan de ni mana parita kan kultur amalakasya manana panjarana.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "r ary manomboka izao dia asesibila naizanaiza maneran-tany ny podikasta tanjana hatrany dia ny manaparitaka ny koltiora malagasy manana fandrarana",
+          "confidence": 0.888
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00022_00102920_00107980.wav",
+      "start": 102.92,
+      "end": 107.98,
+      "reference": "Man pochaku eta madagaskyar ar misi ulla manantan leta mar ar yazo apisandjata na chan.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "ana mampivoatra koa eto madagasikara ary misy olona manana talenta maro ary azo hampisondratana hatrany",
+          "confidence": 0.928
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00023_00108040_00111360.wav",
+      "start": 108.04,
+      "end": 111.36,
+      "reference": "Tunga su etam ni platoa njocha, Jocelyne, de falbeze, manjaya na bonjwanya.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "any tongasoa tamin'ny platorany aotra rao solina dia faly be zahay anday anaha",
+          "confidence": 0.633
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00024_00111640_00117060.wav",
+      "start": 111.64,
+      "end": 117.06,
+      "reference": "Ya, makasi txeka njocha, njaya na anjwanya. Jocelyne, njaya mersuni, narakwa, panjarana.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "ia mankasitraka ny aotra nandray ana androany rao sy lina andriamiatso ny anarako mpandraharaha",
+          "confidence": 0.808
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00025_00117060_00121320.wav",
+      "start": 117.06,
+      "end": 121.32,
+      "reference": "A, ma t'yanna mbreza ka komunikasyon digitala arian ku formatriz.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "raha matihanina miresaka kominikasio dizitala ary ihany koa foromatrisy",
+          "confidence": 0.916
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00026_00122160_00128419.wav",
+      "start": 122.16,
+      "end": 128.42,
+      "reference": "Joselina eto mniocha, anjan t'iga ireza ka mbani tutulu ni serasera sini community management.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "rasilina eto amin'ny aotra andrantsika hiresaka momba ny tontolon'ny serasera sy ny kmi",
+          "confidence": 0.85
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00027_00128919_00135140.wav",
+      "start": 128.92,
+      "end": 135.14,
+      "reference": "Ma ita karazanul manana volante pe, avu ma ita nofuts de inna nyombat kisa u.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "mahita karazan'olona manana volante bea vao mahita anao fotsiny dia inona ny eo ambadik' izao",
+          "confidence": 0.922
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00028_00135400_00140380.wav",
+      "start": 135.4,
+      "end": 140.38,
+      "reference": "Volante alua, te tena mistko sa t'i, angama ni yamalikon se fanta ni noze,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "volonte aloha dia tena misy tokoa satria angamba ny amaliko an'izay fanontanianao izay",
+          "confidence": 0.926
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00029_00140500_00146560.wav",
+      "start": 140.5,
+      "end": 146.56,
+      "reference": "te ita tarakel ni ndu wakuta naten l'ireza ka fanja arana, sa t'i, se mokle we volantezea.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "aizay dia hita tarakely ny niandohako tanatin'ilay resaka fandraharana satria izay moaka ilay hoe volonte izay",
+          "confidence": 0.9
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00030_00146560_00150760.wav",
+      "start": 146.56,
+      "end": 150.76,
+      "reference": "atotikewe kriteria afana mandruzo anaten tutulu fanjarana.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "izay ataontsika hoe kritera ahafahana mandroso anatin'ny tontolon'ny fandraharana",
+          "confidence": 0.952
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00031_00150860_00153580.wav",
+      "start": 150.86,
+      "end": 153.58,
+      "reference": "Raiferi naka kel, nye tu fultona lasa,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "ny raha hiverenako kely ny itoy folo taona lasa",
+          "confidence": 0.844
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00032_00153580_00156400.wav",
+      "start": 153.58,
+      "end": 156.4,
+      "reference": "zanweta mtona timiwe fulsuru arifta nuanya,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "sa izany hoe taminy taona dimy ambinny folo sy roa arivo tany hoan",
+          "confidence": 0.904
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00033_00156500_00159860.wav",
+      "start": 156.5,
+      "end": 159.86,
+      "reference": "de zamu zani ulatan atotikewe pakartie,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "any dia izaho moa izany ny olona atanady nataontsika hoe bakarsi",
+          "confidence": 0.881
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00034_00161680_00165080.wav",
+      "start": 161.68,
+      "end": 165.08,
+      "reference": "de anaten zan keto zania ato madingia le tejana,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "dia anatin'izany ceto izany atao madinika ilay toerana",
+          "confidence": 0.898
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00035_00165200_00169760.wav",
+      "start": 165.2,
+      "end": 169.76,
+      "reference": "de yenowa refanatun tutuluwe tsi demisi ula,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "rana dia ianao rehefa anatin'ny tontolo hoe tsy dia misy olona",
+          "confidence": 0.932
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00036_00170420_00172780.wav",
+      "start": 170.42,
+      "end": 172.78,
+      "reference": "panjarara mantitna nouna ulawe,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "mpandraharaha manodidina anao na olona hoe ma",
+          "confidence": 0.957
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00037_00172780_00178820.wav",
+      "start": 172.78,
+      "end": 178.82,
+      "reference": "Manana tanzu na locha, ta fi txana txan ble, onfironmo, sem tarqia nomi, txam lala na samyafa.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "bola hoe manana tanjona loatra dia tafiditra anatin'ilay anriromao izay mitarika anao mety amin'ny lalana samihafa",
+          "confidence": 0.904
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00038_00179020_00185440.wav",
+      "start": 179.02,
+      "end": 185.44,
+      "reference": "Te yo se folonte, zewe, folonte ano yansi, zano fa noma njuswa, refatewa non savachana kre,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "dia io izay volonte izay hoe ny volaonte hanao ihany sisa nafahanao mandroso rehefa te hanao zavatra anankiray en",
+          "confidence": 0.886
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00039_00185500_00191180.wav",
+      "start": 185.5,
+      "end": 191.18,
+      "reference": "non se txin onfironmo, te anizan savachana kre, ma tungano we, achachan tanzu na zey txachar nou,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "kiray ianao satria eo avy ranomao dia anisan'ny zavatra anankiray mahatonga anao ho atratrany tanjona izay tratrarinao",
+          "confidence": 0.887
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00040_00191280_00196760.wav",
+      "start": 191.28,
+      "end": 196.76,
+      "reference": "te zey anatun zey we, fide tavana, zey tutulun fanjaran zeya,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "nao dia izay anatin'izay hoe fitadiavana asa izay tontolon'ny fandraharahana izay",
+          "confidence": 0.934
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00041_00196760_00201380.wav",
+      "start": 196.76,
+      "end": 201.38,
+      "reference": "sa barat fa idano an tavanan, te milan se discipline, zi folonte zey non,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "izay zavatra tsy fahitana ao andavanandro dia mila izay disiplinina sy volonte izay ianao mba",
+          "confidence": 0.923
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00042_00201380_00204860.wav",
+      "start": 201.38,
+      "end": 204.86,
+      "reference": "ba tunga nowa u tchacham nita nzono zei ti nowa tunga vana.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "ianao mba ahatonga anao ho tratra amin'ny tanjona izay tianao atongavana",
+          "confidence": 0.952
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00043_00204900_00207200.wav",
+      "start": 204.9,
+      "end": 207.2,
+      "reference": "Tena nukatam ftona tezi non natsapa we,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "ana dia nanomboka tamin'ny fotoana tay izy ianao nonahatsafa ho",
+          "confidence": 0.903
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00044_00210940_00214380.wav",
+      "start": 210.94,
+      "end": 214.38,
+      "reference": "Ra we nire zaka zazane atoku we,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "izay raha hoe niresaka zaza ny ataoko hoe",
+          "confidence": 0.925
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00045_00215340_00217920.wav",
+      "start": 215.34,
+      "end": 217.92,
+      "reference": "nanana nzei shonsa zay anzachi we,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "nananany izay ifomosa izay ihany satria hoe",
+          "confidence": 0.911
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00046_00221180_00223480.wav",
+      "start": 221.18,
+      "end": 223.48,
+      "reference": "tena we manana nyamp bea,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "ary tsy dia tena hoe manana ny ampy be",
+          "confidence": 0.879
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00047_00231380_00240080.wav",
+      "start": 231.38,
+      "end": 240.08,
+      "reference": "Te tam sefton zea otne, nizaka ntzer puki, namak puki, ntadi nzavacha, ifelan nzavacha itaku masan.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "dia tamin'izay fotoan'izay ohatran'ny hoe niezaka nijery boky namaky boky nianitadyn'ny zavatra ivelany ny zavatra hitako maso izany",
+          "confidence": 0.918
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00048_00240220_00245020.wav",
+      "start": 240.22,
+      "end": 245.02,
+      "reference": "Reba misona muzan larbi ari varen, te tsetena we mfokam la lomerakam nekizio atan anafa,",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "izany rehafa misy otona moa izany latrobe harivaireny dia tsy dia tena hoe ivakamilalo miaka amin'ny angizy o an-an",
+          "confidence": 0.835
+        }
+      }
+    },
+    {
+      "audio": "VERT_LE_POUVOIR_DU_DIGITAL_AU_FEMININ___le_monde_du_free-lance_malgache___JOSCELINE_LADIES_GITAL__1_00049_00245180_00251880.wav",
+      "start": 245.18,
+      "end": 251.88,
+      "reference": "nizaka mandi biblioteki, nizaka nzir dokumenteram tele, eno manzir.",
+      "predictions": {
+        "w2v-bert-2.0-malagasy-asr": {
+          "hypothesis": "fa miezaka mandeha biblotaiky miezaka mijery dokomantaera amy tele amin'ny haino aman-jery",
+          "confidence": 0.895
+        }
+      }
+    }
+  ]
+}
