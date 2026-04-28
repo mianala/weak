@@ -71,20 +71,41 @@ dataset/
 └── podcast.label_studio.json
 ```
 
-Each task in the JSON file:
+Each task in the JSON file is shaped for direct Label Studio import — the
+weak transcript is injected as a prediction so it pre-fills the editable
+`<TextArea>`, while `data.*` stays flat so `$audio` / `$text` /
+`$confidence` references in your `<Audio>` and `<Header>` tags resolve:
 
 ```json
 {
-  "audio": "podcast_00000_00012300_00023700.wav",
-  "start": 12.3,
-  "end": 23.7,
-  "text": "weak transcription here",
-  "confidence": 0.71
+  "data": {
+    "audio": "podcast_00000_00012300_00023700.wav",
+    "start": 12.3,
+    "end": 23.7,
+    "text": "weak transcription here",
+    "confidence": 0.71
+  },
+  "predictions": [
+    {
+      "model_version": "large-v3",
+      "score": 0.71,
+      "result": [
+        {
+          "from_name": "transcription",
+          "to_name": "audio",
+          "type": "textarea",
+          "value": { "text": ["weak transcription here"] }
+        }
+      ]
+    }
+  ]
 }
 ```
 
-`start` / `end` are timestamps in the **original recording**; the clip
-file itself starts at 0.
+`from_name` must match the `name` on your `<TextArea>` (default
+`transcription`) and `to_name` must match the `<Audio>` element (default
+`audio`). `start` / `end` are timestamps in the **original recording**;
+the clip file itself starts at 0.
 
 ## Notes for Malagasy / mixed-language audio
 

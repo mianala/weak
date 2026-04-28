@@ -242,18 +242,20 @@ def discover_clips(input_path: Path) -> tuple[list[dict], Path | None]:
     - If input is a single audio file: one item, no reference.
     """
     if input_path.is_file() and input_path.suffix.lower() == ".json":
-        data = json.loads(input_path.read_text(encoding="utf-8"))
+        tasks = json.loads(input_path.read_text(encoding="utf-8"))
         base = input_path.parent
         items = []
-        for t in data:
-            audio_field = t.get("audio", "")
+        for t in tasks:
+            # Tasks are emitted in Label Studio's {"data": {...}, "predictions": [...]} shape.
+            d = t.get("data") or {}
+            audio_field = d.get("audio", "")
             # Strip any Label Studio URL prefix (e.g. "/data/local-files/?d=...")
             name = audio_field.rsplit("/", 1)[-1].rsplit("=", 1)[-1]
             items.append({
                 "audio": base / name,
-                "ref": t.get("text"),
-                "start": t.get("start"),
-                "end": t.get("end"),
+                "ref": d.get("text"),
+                "start": d.get("start"),
+                "end": d.get("end"),
             })
         return items, input_path
 
