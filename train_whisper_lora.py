@@ -74,13 +74,14 @@ from typing import Any
 def load_label_studio_json(json_path: Path, clip_root: Path) -> list[dict]:
     """Each Label Studio task -> {audio_path, sentence}.
     Discards rows with empty text — that's where the human hasn't reviewed yet."""
-    data = json.loads(json_path.read_text(encoding="utf-8"))
+    tasks = json.loads(json_path.read_text(encoding="utf-8"))
     rows: list[dict] = []
-    for t in data:
-        text = (t.get("text") or "").strip()
+    for t in tasks:
+        d = t.get("data") or {}
+        text = (d.get("text") or "").strip()
         if not text:
             continue
-        audio_field = t.get("audio", "")
+        audio_field = d.get("audio", "")
         name = audio_field.rsplit("/", 1)[-1].rsplit("=", 1)[-1]
         path = clip_root / name
         if not path.exists():

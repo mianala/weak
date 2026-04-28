@@ -73,7 +73,8 @@ def main() -> None:
     n_done = 0
     conf_field = "confidence" if args.field == "text" else f"{args.field}_confidence"
     for t in tqdm(tasks, desc="asr", unit="seg"):
-        audio_field = t.get("audio", "")
+        d = t.setdefault("data", {})
+        audio_field = d.get("audio", "")
         name = audio_field.rsplit("/", 1)[-1].rsplit("=", 1)[-1]
         clip = base / name
         if not clip.exists():
@@ -87,13 +88,31 @@ def main() -> None:
             continue
         # Preserve the prior value if requested (for code-switched audio:
         # keep Whisper's French/English-friendly text alongside BadRex's Malagasy).
-        if args.keep_original_as and args.keep_original_as not in t:
-            t[args.keep_original_as] = t.get(args.field, "")
-            old_conf = t.get("confidence")
+        if args.keep_original_as and args.keep_original_as not in d:
+            d[args.keep_original_as] = d.get(args.field, "")
+            old_conf = d.get("confidence")
             if old_conf is not None:
-                t[f"{args.keep_original_as}_confidence"] = old_conf
-        t[args.field] = text
-        t[conf_field] = round(conf, 3)
+                d[f"{args.keep_original_as}_confidence"] = old_conf
+        d[args.field] = text
+        d[conf_field] = round(conf, 3)
+        # If we just rewrote the primary `text`, also re-fill the editable
+        # TextArea by replacing the prediction the segmenter emitted. Side
+        # columns (text_whisper_fr, text_badrex, ...) leave the prediction alone.
+        if args.field == "text":
+            t["predictions"] = [
+                {
+                    "model_version": args.model,
+                    "score": round(conf, 3),
+                    "result": [
+                        {
+                            "from_name": "transcription",
+                            "to_name": "audio",
+                            "type": "textarea",
+                            "value": {"text": [text]},
+                        }
+                    ],
+                }
+            ]
         n_done += 1
 
     json_path.write_text(json.dumps(tasks, ensure_ascii=False, indent=2), encoding="utf-8")

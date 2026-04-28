@@ -730,14 +730,36 @@ def main() -> None:
                     total_duration=total_duration,
                 )
             audio_ref = f"{args.audio_url_prefix}{clip_name}" if args.audio_url_prefix else clip_name
-            task = {
+            text = s.text or ""
+            data = {
                 "audio": audio_ref,
                 "start": round(s.start, 3),
                 "end": round(s.end, 3),
-                "text": s.text,
+                "text": text,
             }
             if s.confidence is not None:
-                task["confidence"] = round(s.confidence, 3)
+                data["confidence"] = round(s.confidence, 3)
+            # Inject the weak transcript via a prediction so Label Studio pre-fills
+            # the editable <TextArea name="transcription"> for annotators. The
+            # data.* fields above stay flat so $audio / $text / $confidence
+            # substitutions still work in <Audio> and <Header>.
+            task = {
+                "data": data,
+                "predictions": [
+                    {
+                        "model_version": args.asr_model or args.model,
+                        "score": round(s.confidence, 3) if s.confidence is not None else 0.0,
+                        "result": [
+                            {
+                                "from_name": "transcription",
+                                "to_name": "audio",
+                                "type": "textarea",
+                                "value": {"text": [text]},
+                            }
+                        ],
+                    }
+                ],
+            }
             tasks.append(task)
 
         json_path = project_dir / f"{stem}.label_studio.json"

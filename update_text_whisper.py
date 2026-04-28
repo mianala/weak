@@ -108,7 +108,8 @@ def main() -> None:
 
     n_done = 0
     for t in tqdm(tasks, desc="whisper", unit="seg"):
-        audio_field = t.get("audio", "")
+        d = t.setdefault("data", {})
+        audio_field = d.get("audio", "")
         name = audio_field.rsplit("/", 1)[-1].rsplit("=", 1)[-1]
         clip = base / name
         if not clip.exists():
@@ -119,9 +120,9 @@ def main() -> None:
         except Exception as e:
             print(f"[err] {clip.name}: {e}", flush=True)
             continue
-        t[args.field] = text
+        d[args.field] = text
         if conf is not None:
-            t[conf_field] = round(conf, 3)
+            d[conf_field] = round(conf, 3)
         n_done += 1
 
     json_path.write_text(json.dumps(tasks, ensure_ascii=False, indent=2), encoding="utf-8")
