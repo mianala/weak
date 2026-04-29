@@ -132,6 +132,9 @@ def slice_wav(
     e = end + pad_tail
     if total_duration is not None:
         e = min(e, total_duration)
+    # ffmpeg won't create missing parent dirs and reports the failure as a
+    # generic ENOENT — make sure the destination directory exists.
+    dst.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         ffmpeg_bin(), "-y",
         "-ss", f"{s:.3f}", "-to", f"{e:.3f}",
@@ -154,6 +157,10 @@ class Segment:
     end: float
     text: str
     confidence: float | None = None
+    # Filled when --asr-model is set. We keep Whisper's draft (above) AND the
+    # CTC ASR's draft so reviewers in Label Studio see both versions.
+    text_badrex: str | None = None
+    confidence_badrex: float | None = None
 
 
 def _emit_chunk(words_slice) -> Segment:
@@ -533,8 +540,8 @@ def retranscribe_segments(
     pad_head: float = 0.15,
     pad_tail: float = 0.25,
 ) -> None:
-    """Replace each segment's `text` and `confidence` with output from the CTC
-    model. Mutates `segs` in place."""
+    """Add a CTC-ASR draft (text_badrex / confidence_badrex) to each segment
+    alongside Whisper's draft. Mutates `segs` in place."""
     total = len(master_audio)
     for s in tqdm(segs, desc="asr", unit="seg"):
         i0 = max(0, int((s.start - pad_head) * sample_rate))
@@ -547,8 +554,8 @@ def retranscribe_segments(
         except Exception as e:
             print(f"[asr] segment {s.start:.2f}-{s.end:.2f} failed: {e}", flush=True)
             continue
-        s.text = text
-        s.confidence = conf
+        s.text_badrex = text
+        s.confidence_badrex = conf
 
 
 def pick_device(arg: str) -> tuple[str, str]:
@@ -589,11 +596,11 @@ def main() -> None:
     ap.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     ap.add_argument("--require-gpu", action="store_true",
                     help="Abort with an error if the GPU isn't usable, instead of falling back to CPU.")
-    ap.add_argument("--asr-model", default="",
-                    help="Optional HuggingFace CTC ASR model id used to replace Whisper's draft "
-                         "text per segment (Whisper still does VAD + segmentation). "
-                         "Example: 'Ilakorasoa/w2v-bert-2.0-malagasy-asr'. "
-                         "Leave empty to keep Whisper's text.")
+    ap.add_argument("--asr-model", default="BadRex/w2v-bert-2.0-malagasy-asr",
+                    help="HuggingFace CTC ASR model id used to add a second draft "
+                         "alongside Whisper's (Whisper still does VAD + segmentation). "
+                         "Defaults to BadRex/w2v-bert-2.0-malagasy-asr. "
+                         "Pass --asr-model '' to disable and keep Whisper-only output.")
     ap.add_argument("--min-seg", type=float, default=2.0, help="Drop segments shorter than this (s).")
     ap.add_argument("--max-seg", type=float, default=30.0, help="Re-split segments longer than this (s).")
     ap.add_argument("--target-seg", type=float, default=20.0, help="Target chunk length when splitting (s).")
@@ -730,36 +737,53 @@ def main() -> None:
                     total_duration=total_duration,
                 )
             audio_ref = f"{args.audio_url_prefix}{clip_name}" if args.audio_url_prefix else clip_name
-            text = s.text or ""
+            whisper_text = s.text or ""
+            badrex_text = s.text_badrex or ""
+            # Primary `text` is the BadRex draft when present (target-language
+            # fine-tune wins over Whisper's noisy multilingual decode), else Whisper.
+            primary_text = badrex_text if s.text_badrex is not None else whisper_text
+            primary_conf = s.confidence_badrex if s.text_badrex is not None else s.confidence
             data = {
                 "audio": audio_ref,
                 "start": round(s.start, 3),
                 "end": round(s.end, 3),
-                "text": text,
+                "text": primary_text,
+                "text_whisper": whisper_text,
             }
             if s.confidence is not None:
-                data["confidence"] = round(s.confidence, 3)
-            # Inject the weak transcript via a prediction so Label Studio pre-fills
-            # the editable <TextArea name="transcription"> for annotators. The
-            # data.* fields above stay flat so $audio / $text / $confidence
-            # substitutions still work in <Audio> and <Header>.
-            task = {
-                "data": data,
-                "predictions": [
-                    {
-                        "model_version": args.asr_model or args.model,
-                        "score": round(s.confidence, 3) if s.confidence is not None else 0.0,
-                        "result": [
-                            {
-                                "from_name": "transcription",
-                                "to_name": "audio",
-                                "type": "textarea",
-                                "value": {"text": [text]},
-                            }
-                        ],
-                    }
-                ],
-            }
+                data["confidence"] = round(primary_conf, 3) if primary_conf is not None else 0.0
+                data["confidence_whisper"] = round(s.confidence, 3)
+            if s.text_badrex is not None:
+                data["text_badrex"] = badrex_text
+                if s.confidence_badrex is not None:
+                    data["confidence_badrex"] = round(s.confidence_badrex, 3)
+
+            # One prediction per model so Label Studio shows both drafts side-by-side
+            # under the same <TextArea>. The first prediction is the one Label Studio
+            # pre-fills; we put the stronger model first.
+            predictions = []
+            if s.text_badrex is not None:
+                predictions.append({
+                    "model_version": args.asr_model,
+                    "score": round(s.confidence_badrex, 3) if s.confidence_badrex is not None else 0.0,
+                    "result": [{
+                        "from_name": "transcription",
+                        "to_name": "audio",
+                        "type": "textarea",
+                        "value": {"text": [badrex_text]},
+                    }],
+                })
+            predictions.append({
+                "model_version": f"whisper-{args.model}",
+                "score": round(s.confidence, 3) if s.confidence is not None else 0.0,
+                "result": [{
+                    "from_name": "transcription",
+                    "to_name": "audio",
+                    "type": "textarea",
+                    "value": {"text": [whisper_text]},
+                }],
+            })
+            task = {"data": data, "predictions": predictions}
             tasks.append(task)
 
         json_path = project_dir / f"{stem}.label_studio.json"

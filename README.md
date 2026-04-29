@@ -51,6 +51,9 @@ python segment_audio.py <input> [options]
   --language CODE        Whisper language code. Default: mg (Malagasy).
                          Use 'auto' to let Whisper detect.
   --model NAME           tiny | base | small | medium | large-v3 (default).
+  --asr-model ID         HuggingFace CTC ASR model run alongside Whisper.
+                         Default: BadRex/w2v-bert-2.0-malagasy-asr.
+                         Pass --asr-model '' to disable.
   --device {auto,cpu,cuda}
   --min-seg SEC          Drop clips shorter than this (default 2).
   --max-seg SEC          Re-split clips longer than this (default 30).
@@ -82,25 +85,44 @@ weak transcript is injected as a prediction so it pre-fills the editable
     "audio": "podcast_00000_00012300_00023700.wav",
     "start": 12.3,
     "end": 23.7,
-    "text": "weak transcription here",
-    "confidence": 0.71
+    "text": "badrex draft here",
+    "text_whisper": "whisper draft here",
+    "text_badrex": "badrex draft here",
+    "confidence": 0.83,
+    "confidence_whisper": 0.71,
+    "confidence_badrex": 0.83
   },
   "predictions": [
     {
-      "model_version": "large-v3",
+      "model_version": "BadRex/w2v-bert-2.0-malagasy-asr",
+      "score": 0.83,
+      "result": [
+        {
+          "from_name": "transcription",
+          "to_name": "audio",
+          "type": "textarea",
+          "value": { "text": ["badrex draft here"] }
+        }
+      ]
+    },
+    {
+      "model_version": "whisper-large-v3",
       "score": 0.71,
       "result": [
         {
           "from_name": "transcription",
           "to_name": "audio",
           "type": "textarea",
-          "value": { "text": ["weak transcription here"] }
+          "value": { "text": ["whisper draft here"] }
         }
       ]
     }
   ]
 }
 ```
+
+When `--asr-model` is omitted, only the Whisper prediction and `text_whisper` are
+emitted (and `data.text` falls back to Whisper's draft).
 
 `from_name` must match the `name` on your `<TextArea>` (default
 `transcription`) and `to_name` must match the `<Audio>` element (default
