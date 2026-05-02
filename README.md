@@ -129,6 +129,33 @@ emitted (and `data.text` falls back to Whisper's draft).
 `audio`). `start` / `end` are timestamps in the **original recording**;
 the clip file itself starts at 0.
 
+## Fine-tuning Whisper
+
+Once you have reviewed transcripts, you can fine-tune Whisper on them.
+Scripts and instructions live in [`train/`](train/README.md):
+
+```bash
+# Full fine-tune (HF Audio Course recipe)
+uv run train/train_whisper.py \
+  --base openai/whisper-small --language mg \
+  --hf-dataset mozilla-foundation/common_voice_17_0:mg \
+  --train-json dataset/storytown_bolo/storytown_bolo.label_studio.json \
+  --train-clip-root dataset/storytown_bolo \
+  --output ./fine-tunes/whisper-small-mg
+
+# LoRA + 8-bit (fits on 12 GB GPU)
+uv run train/train_whisper_lora.py \
+  --base openai/whisper-small --language mg \
+  --train-json dataset/storytown_bolo/storytown_bolo.label_studio.json \
+  --train-clip-root dataset/storytown_bolo \
+  --extra-dataset mozilla-foundation/common_voice_17_0:mg \
+  --output ./fine-tunes/whisper-small-mg-lora
+```
+
+See [`train/README.md`](train/README.md) for the full CLI, smoke-test command,
+and notes on pseudo-labeling unreviewed clips with
+[`badrex/w2v-bert-2.0-malagasy-asr`](https://huggingface.co/badrex/w2v-bert-2.0-malagasy-asr).
+
 ## Notes for Malagasy / mixed-language audio
 
 - The default `--language mg` forces Malagasy decoding. If recordings mix
