@@ -33,26 +33,28 @@ uv run train/train_whisper.py \
 
 **Option B — download once with the HF CLI**, then train normally.
 
-Install the CLI if needed:
+Install the CLI if needed (the modern command is `hf`; `huggingface-cli` is deprecated):
 
 ```bash
-uv tool install "huggingface_hub[cli]"
+uv tool install huggingface_hub
 ```
+
+Or run it ad-hoc with `uvx --from huggingface_hub hf ...` (no global install).
 
 PowerShell (Windows) — point `HF_HOME` at a drive with space first:
 
 ```powershell
-$env:HF_HOME = "D:\hf-cache"
-huggingface-cli download badrex/malagasy-speech-full `
+$env:HF_HOME = "E:\hf-cache"
+hf download badrex/malagasy-speech-full `
   --repo-type dataset `
-  --local-dir D:\hf-data\malagasy-speech-full
+  --local-dir E:\hf-data\malagasy-speech-full
 ```
 
 Bash / macOS / Linux:
 
 ```bash
 export HF_HOME=/mnt/data/hf-cache
-huggingface-cli download badrex/malagasy-speech-full \
+hf download badrex/malagasy-speech-full \
   --repo-type dataset \
   --local-dir /mnt/data/hf-data/malagasy-speech-full
 ```

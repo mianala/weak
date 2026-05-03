@@ -2,16 +2,16 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#   "transformers>=4.45.0",
+#   "transformers>=4.45.0,<5.0",
 #   "torch>=2.3.0",
-#   "datasets>=2.20.0",
+#   "datasets>=2.20.0,<3.0",
 #   "evaluate>=0.4.0",
 #   "jiwer>=3.0.0",
-#   "accelerate>=0.34.0",
+#   "accelerate>=0.34.0,<1.10",
 #   "soundfile>=0.12.1",
 #   "librosa>=0.10.0",
 #   "imageio-ffmpeg>=0.5.1",
-#   "numpy>=1.26.0",
+#   "numpy>=1.26.0,<2.0",
 # ]
 #
 # [[tool.uv.index]]
@@ -142,18 +142,29 @@ def build_dataset(args, processor):
         parts.append(ds_local)
 
     for spec in args.hf_dataset or []:
-        # "<repo>" or "<repo>:<config>"
-        # e.g. "badrex/malagasy-speech-full" (no config)
-        # e.g. "mozilla-foundation/common_voice_17_0:mg"
-        repo, _, cfg = spec.partition(":")
-        cfg = cfg or None
-        label = f"{repo}:{cfg}" if cfg else repo
-        print(f"[data] loading {label} (streaming={args.stream})", flush=True)
-        ld_kwargs = dict(trust_remote_code=True, streaming=args.stream)
-        try:
-            tr = load_dataset(repo, cfg, split="train", **ld_kwargs)
-        except Exception:
-            tr = load_dataset(repo, cfg, split="train+validation", **ld_kwargs)
+        # "<repo>" or "<repo>:<config>"  (HF hub)
+        # OR a local directory containing data/ subdir with parquet files
+        # (e.g. one produced by `hf download --local-dir`).
+        from os.path import isdir
+        as_path = Path(spec).expanduser()
+        if isdir(as_path) and (as_path / "data").is_dir():
+            print(f"[data] loading local parquet from {as_path}", flush=True)
+            files = sorted((as_path / "data").glob("train-*.parquet")) \
+                or sorted((as_path / "data").glob("*.parquet"))
+            if args.max_train_samples and args.max_parquet_shards:
+                files = files[: args.max_parquet_shards]
+                print(f"[data] limiting to first {len(files)} parquet shard(s)", flush=True)
+            tr = load_dataset("parquet", data_files=[str(p) for p in files], split="train")
+        else:
+            repo, _, cfg = spec.partition(":")
+            cfg = cfg or None
+            label = f"{repo}:{cfg}" if cfg else repo
+            print(f"[data] loading {label} (streaming={args.stream})", flush=True)
+            ld_kwargs = dict(trust_remote_code=True, streaming=args.stream)
+            try:
+                tr = load_dataset(repo, cfg, split="train", **ld_kwargs)
+            except Exception:
+                tr = load_dataset(repo, cfg, split="train+validation", **ld_kwargs)
         if args.stream:
             # Streaming IterableDatasets can't concat with mapped local Datasets;
             # materialize to a regular Dataset, optionally capped.
@@ -166,7 +177,7 @@ def build_dataset(args, processor):
             None,
         )
         if col_text is None:
-            sys.exit(f"No text column on {repo}; columns={cols}")
+            sys.exit(f"No text column on {spec}; columns={cols}")
         col_audio = "audio" if "audio" in cols else next((c for c in cols if "audio" in c.lower()), "audio")
         if col_audio != "audio":
             tr = tr.rename_column(col_audio, "audio")
@@ -247,6 +258,9 @@ def main() -> None:
                          "Useful for huge datasets like badrex/malagasy-speech-full (124 GB).")
     ap.add_argument("--max-hf-samples", type=int, default=0,
                     help="When --stream, cap rows pulled per HF dataset (default 5000).")
+    ap.add_argument("--max-parquet-shards", type=int, default=0,
+                    help="When loading a local parquet directory, only read this "
+                         "many shard files. Useful for smoke tests; ignored when 0.")
     ap.add_argument("--pseudo-label",
                     help="HF model id used to label unreviewed clips "
                          "(e.g. 'badrex/w2v-bert-2.0-malagasy-asr'). "
@@ -271,6 +285,11 @@ def main() -> None:
 
     if not args.train_json and not args.hf_dataset:
         sys.exit("Provide at least one of --train-json or --hf-dataset.")
+
+    # Import datasets/pyarrow BEFORE torch — on Windows, importing pyarrow after
+    # torch's CUDA DLLs is loaded triggers an access-violation segfault.
+    import datasets  # noqa: F401
+    import pyarrow   # noqa: F401
 
     import torch
     from transformers import (
