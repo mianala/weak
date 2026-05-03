@@ -96,37 +96,46 @@ def build_dataset(args, processor):
     from datasets import Dataset, Audio, concatenate_datasets, load_dataset
 
     rows: list[dict] = []
-    for json_path in args.train_json:
+    for json_path in args.train_json or []:
         json_path = Path(json_path).resolve()
         clip_root = Path(args.train_clip_root or json_path.parent).resolve()
         rows.extend(load_label_studio_json(json_path, clip_root))
-    if not rows:
-        sys.exit("No usable rows from --train-json. Are the clips reviewed/corrected?")
 
-    ds_local = Dataset.from_list(rows).cast_column("audio_path", Audio(sampling_rate=16000))
-    ds_local = ds_local.rename_columns({"audio_path": "audio"})
+    parts = []
+    if rows:
+        ds_local = Dataset.from_list(rows).cast_column("audio_path", Audio(sampling_rate=16000))
+        ds_local = ds_local.rename_columns({"audio_path": "audio"})
+        parts.append(ds_local)
 
-    extras = []
     for spec in args.extra_dataset or []:
         # Format: "<repo>:<config>" e.g. "mozilla-foundation/common_voice_17_0:mg"
-        repo, _, cfg = spec.partition(":")
-        if not cfg:
-            sys.exit(f"--extra-dataset must be 'repo:config', got '{spec}'.")
-        print(f"[data] streaming {repo} ({cfg})", flush=True)
-        extra = load_dataset(repo, cfg, split="train", trust_remote_code=True)
-        # Normalize column names. Common Voice uses 'sentence', FLEURS uses 'transcription'.
+        # Or a local path to a HF dataset directory (no ':cfg' needed).
+        local_path = Path(spec)
+        if local_path.exists() and local_path.is_dir():
+            print(f"[data] loading local dataset {local_path}", flush=True)
+            extra = load_dataset(str(local_path), split="train", trust_remote_code=True)
+        else:
+            repo, _, cfg = spec.partition(":")
+            if not cfg:
+                sys.exit(f"--extra-dataset must be 'repo:config' or a local path, got '{spec}'.")
+            print(f"[data] loading {repo} ({cfg})", flush=True)
+            extra = load_dataset(repo, cfg, split="train", trust_remote_code=True)
+        # Normalize column names. Common Voice uses 'sentence', FLEURS / BadRex use 'transcription'.
         col_text = "sentence" if "sentence" in extra.column_names else (
             "transcription" if "transcription" in extra.column_names else None
         )
         if col_text is None:
-            sys.exit(f"Don't know which text column to use for {repo}; columns={extra.column_names}")
+            sys.exit(f"Don't know which text column to use for {spec}; columns={extra.column_names}")
         extra = extra.cast_column("audio", Audio(sampling_rate=16000))
         extra = extra.remove_columns([c for c in extra.column_names if c not in ("audio", col_text)])
         if col_text != "sentence":
             extra = extra.rename_column(col_text, "sentence")
-        extras.append(extra)
+        parts.append(extra)
 
-    full = concatenate_datasets([ds_local, *extras]) if extras else ds_local
+    if not parts:
+        sys.exit("No data: provide --train-json with reviewed clips and/or --extra-dataset.")
+
+    full = concatenate_datasets(parts) if len(parts) > 1 else parts[0]
     full = full.shuffle(seed=args.seed)
     if args.max_train_samples:
         full = full.select(range(min(args.max_train_samples, len(full))))
@@ -176,8 +185,8 @@ def main() -> None:
                     help="Base Whisper checkpoint (small/medium recommended for 12 GB GPUs).")
     ap.add_argument("--language", required=True,
                     help="Whisper language code (e.g. 'mg' for Malagasy).")
-    ap.add_argument("--train-json", action="append", required=True,
-                    help="Label Studio JSON file(s). Repeat for multiple.")
+    ap.add_argument("--train-json", action="append", default=[],
+                    help="Label Studio JSON file(s). Repeat for multiple. Optional if --extra-dataset is given.")
     ap.add_argument("--train-clip-root", default="",
                     help="Directory containing the clips referenced by the JSON. "
                          "Defaults to the JSON's parent.")
@@ -205,6 +214,8 @@ def main() -> None:
     ap.add_argument("--lora-dropout", type=float, default=0.05)
     args = ap.parse_args()
 
+    import faulthandler
+    faulthandler.enable()
     import torch
     from transformers import (
         WhisperProcessor, WhisperForConditionalGeneration,
@@ -251,10 +262,14 @@ def main() -> None:
         lora_dropout=args.lora_dropout,
         target_modules=["q_proj", "v_proj"],
         bias="none",
-        task_type="SEQ_2_SEQ_LM",
+        # No task_type — Whisper's input_features signature collides with
+        # SEQ_2_SEQ_LM's auto-injection of input_ids.
     )
+    print("[peft] wrapping with LoRA", flush=True)
     model = get_peft_model(model, lora_cfg)
+    print("[peft] wrapped", flush=True)
     model.print_trainable_parameters()
+    sys.stdout.flush()
 
     print("[data] building train/eval datasets", flush=True)
     train_ds, eval_ds = build_dataset(args, processor)
@@ -300,7 +315,7 @@ def main() -> None:
         eval_dataset=eval_ds,
         data_collator=WhisperCollator(processor),
         compute_metrics=compute_metrics,
-        tokenizer=processor.feature_extractor,  # for padding only
+        processing_class=processor.feature_extractor,  # for padding only
     )
     model.config.use_cache = False  # required for gradient checkpointing
 
