@@ -195,8 +195,11 @@ def main() -> None:
     ap.add_argument("--eval-frac", type=float, default=0.05)
     ap.add_argument("--max-train-samples", type=int, default=0)
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--no-8bit", action="store_true",
-                    help="Disable 8-bit base-model quantization (needs more VRAM).")
+    quant_group = ap.add_mutually_exclusive_group()
+    quant_group.add_argument("--4bit", dest="use_4bit", action="store_true",
+                             help="Load base model in 4-bit (QLoRA). Required for large-v3 on 15 GB GPUs.")
+    quant_group.add_argument("--no-8bit", action="store_true",
+                             help="Disable quantization entirely (needs more VRAM).")
     ap.add_argument("--lora-r", type=int, default=32)
     ap.add_argument("--lora-alpha", type=int, default=64)
     ap.add_argument("--lora-dropout", type=float, default=0.05)
@@ -206,6 +209,7 @@ def main() -> None:
     from transformers import (
         WhisperProcessor, WhisperForConditionalGeneration,
         Seq2SeqTrainer, Seq2SeqTrainingArguments,
+        BitsAndBytesConfig,
     )
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
@@ -216,9 +220,16 @@ def main() -> None:
     processor = WhisperProcessor.from_pretrained(args.base, language=args.language, task="transcribe")
 
     load_kwargs: dict = {}
-    if not args.no_8bit and torch.cuda.is_available():
-        from transformers import BitsAndBytesConfig
-        load_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
+    if torch.cuda.is_available() and not args.no_8bit:
+        if args.use_4bit:
+            load_kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_use_double_quant=True,
+            )
+        else:
+            load_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
         load_kwargs["device_map"] = "auto"
     else:
         load_kwargs["torch_dtype"] = torch.float16 if torch.cuda.is_available() else torch.float32
@@ -231,7 +242,7 @@ def main() -> None:
     model.config.forced_decoder_ids = None
     model.config.suppress_tokens = []
 
-    if not args.no_8bit and torch.cuda.is_available():
+    if torch.cuda.is_available() and not args.no_8bit:
         model = prepare_model_for_kbit_training(model)
 
     lora_cfg = LoraConfig(

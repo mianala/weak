@@ -117,7 +117,7 @@ uv run train/train_whisper.py \
   --output ./fine-tunes/smoketest
 ```
 
-## Quick run — LoRA (12 GB GPU)
+## Quick run — LoRA (12 GB GPU, whisper-small/medium)
 
 ```bash
 uv run train/train_whisper_lora.py \
@@ -128,6 +128,87 @@ uv run train/train_whisper_lora.py \
   --extra-dataset mozilla-foundation/common_voice_17_0:mg \
   --output ./fine-tunes/whisper-small-mg-lora
 ```
+
+## Fine-tuning whisper-large-v3 for free (Google Colab / Kaggle T4)
+
+The free tier on **Google Colab** and **Kaggle** both give a T4 GPU (15 GB VRAM).
+`whisper-large-v3` (~1.5B params) needs **4-bit QLoRA** (`--4bit`) to fit there.
+
+> Note: `badrex/w2v-bert-2.0-malagasy-asr` is the **model**. The training dataset
+> is [`badrex/malagasy-speech-full`](https://huggingface.co/datasets/badrex/malagasy-speech-full)
+> (150 h, ~31 k clips).
+
+### Step 1 — pick a free GPU platform
+
+| Platform | Free GPU | Hours/week | Notes |
+|---|---|---|---|
+| [Kaggle](https://kaggle.com) | T4 × 1 (15 GB) | 30 h | Best free option; connect to internet to pull HF datasets |
+| [Google Colab](https://colab.research.google.com) | T4 (15 GB) | variable | Session-limited; upgrade to Colab Pro ($10/mo) for A100 |
+| [HF Spaces ZeroGPU](https://huggingface.co/spaces) | A10G (24 GB) | free via Spaces | Must wrap in a Gradio/Streamlit app |
+
+### Step 2 — install and run (Colab / Kaggle cell)
+
+```python
+# Cell 1 — install
+!pip install -q transformers datasets accelerate peft bitsandbytes \
+             evaluate jiwer soundfile imageio-ffmpeg
+
+# Cell 2 — clone repo (or upload train_whisper_lora.py directly)
+!git clone https://github.com/YOUR_ORG/weak .
+
+# Cell 3 — log in to HF (needed to stream badrex/malagasy-speech-full)
+from huggingface_hub import login
+login()   # paste your HF read token
+
+# Cell 4 — train (streams dataset, no 124 GB download needed)
+!python train/train_whisper_lora.py \
+  --base openai/whisper-large-v3 \
+  --language mg \
+  --4bit \
+  --extra-dataset badrex/malagasy-speech-full \
+  --max-train-samples 5000 \
+  --batch-size 2 \
+  --grad-accum 8 \
+  --lr 1e-4 \
+  --warmup-steps 50 \
+  --epochs 3 \
+  --output ./fine-tunes/whisper-large-v3-mg-lora
+```
+
+**Memory breakdown on T4 15 GB:**
+- Model weights in 4-bit: ~900 MB
+- LoRA trainable params (q_proj + v_proj, r=32): ~10 M params × fp16 ≈ 20 MB
+- Optimizer states (AdamW on LoRA only): ~80 MB
+- Activations at batch 2, 30 s audio: ~2–4 GB
+- Total: ~6–7 GB → fits comfortably with headroom
+
+If you OOM, add `--lora-r 16` (halves adapter size) or keep `--batch-size 1`.
+
+### Step 3 — save the adapter back to HF Hub
+
+```python
+# Cell 5
+!python train/train_whisper_lora.py \
+  ... \
+  --push-to-hub \
+  --hub-model-id YOUR_HF_USERNAME/whisper-large-v3-malagasy-lora
+```
+
+Or from Python after training:
+
+```python
+from peft import PeftModel
+from transformers import WhisperForConditionalGeneration
+base  = WhisperForConditionalGeneration.from_pretrained("openai/whisper-large-v3")
+model = PeftModel.from_pretrained(base, "./fine-tunes/whisper-large-v3-mg-lora")
+model.push_to_hub("YOUR_HF_USERNAME/whisper-large-v3-malagasy-lora")
+```
+
+### Why not whisper-large full fine-tune?
+
+Full FT of large-v3 in fp16 needs ~40 GB VRAM. That requires an A100 80 GB or
+multi-GPU setup — not available for free. QLoRA is the standard approach for
+large models on consumer/free GPUs and typically recovers >95% of full-FT WER.
 
 ## Use the result
 
