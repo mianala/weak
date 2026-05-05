@@ -56,3 +56,9 @@ venv/
 
 # Data
 dataset/
+
+# Model checkpoints / training outputs
+fine-tunes/
+
+# Claude Code local overrides
+.claude/settings.local.json

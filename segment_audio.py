@@ -391,6 +391,12 @@ def _add_nvidia_dll_dirs() -> None:
             roots = [Path(p) for p in nvidia_spec.submodule_search_locations]
         for root in roots:
             for child in root.iterdir():
+                # Skip cuDNN: torch ships its own (often a different major version)
+                # and prepending the venv's cuDNN to PATH masks torch's, which
+                # breaks transformers/w2v-bert with "Could not load symbol cudnnGetLibConfig".
+                # ctranslate2 only needs cuBLAS / CUDA runtime, so it's safe to skip.
+                if child.name.startswith("cudnn"):
+                    continue
                 bin_dir = child / "bin"
                 if bin_dir.is_dir():
                     bin_dirs.append(str(bin_dir))
@@ -404,6 +410,30 @@ def _add_nvidia_dll_dirs() -> None:
             pass
     if bin_dirs:
         os.environ["PATH"] = os.pathsep.join(bin_dirs) + os.pathsep + os.environ.get("PATH", "")
+
+    # Pre-load torch's bundled cuDNN before ctranslate2 gets a chance to load
+    # its own (older) copy. Windows resolves DLLs by name once loaded, so
+    # whichever cudnn64_9.dll lands in the process first wins for everyone.
+    # Without this, transformers/w2v-bert crashes with "Could not load symbol
+    # cudnnGetLibConfig" because ctranslate2's bundled cuDNN is missing that
+    # symbol that newer torch builds expect.
+    try:
+        import ctypes
+        import importlib.util as _il
+        torch_spec = _il.find_spec("torch")
+        if torch_spec and torch_spec.submodule_search_locations:
+            torch_lib = Path(list(torch_spec.submodule_search_locations)[0]) / "lib"
+            cudnn_dll = torch_lib / "cudnn64_9.dll"
+            if cudnn_dll.exists():
+                # Add torch/lib to the DLL search path so dependent cuDNN sublibs
+                # (cudnn_ops, cudnn_graph, etc.) resolve from the same install.
+                try:
+                    os.add_dll_directory(str(torch_lib))
+                except (OSError, FileNotFoundError):
+                    pass
+                ctypes.WinDLL(str(cudnn_dll))
+    except Exception:
+        pass
 
 
 # Anchor for native model objects so ctranslate2's CUDA destructor doesn't run
@@ -593,7 +623,7 @@ def main() -> None:
                          "Use 'auto' to let Whisper detect.")
     ap.add_argument("--model", default="large-v3",
                     help="faster-whisper model size: tiny|base|small|medium|large-v3|...")
-    ap.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
+    ap.add_argument("--device", default="cuda", choices=["auto", "cpu", "cuda"])
     ap.add_argument("--require-gpu", action="store_true",
                     help="Abort with an error if the GPU isn't usable, instead of falling back to CPU.")
     ap.add_argument("--asr-model", default="BadRex/w2v-bert-2.0-malagasy-asr",
